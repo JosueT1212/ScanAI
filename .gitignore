@@ -5,3 +5,6 @@ data/*.jsonl
 *.pt
 config.local.toml
 .DS_Store
+.superpowers/
+*.egg-info/
+scanai.db

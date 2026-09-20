@@ -48,7 +48,7 @@ iPhone ─Continuity→ cv2.VideoCapture → Detector ────┘         �
                                                                ├→ WS   /ws/live
                                                                ├→ HTTP /api/*
                                                                └→ MJPEG /api/camera.mjpg
-                                                     web/findit.html served locally
+                                                     web/index.html served locally
 ```
 
 ## Modules
@@ -158,7 +158,7 @@ not a pretence held now.
 
 ## Frontend integration
 
-`web/findit.html` is the page already built and approved. One change: a source
+`web/index.html` is the page already built and approved. One change: a source
 adapter. It tries `ws://localhost:8000/ws/live`; on success the scope renders
 measured returns and the camera panel shows the MJPEG stream with **real** boxes.
 On failure it falls back to the synthetic ray-cast exactly as today, so the

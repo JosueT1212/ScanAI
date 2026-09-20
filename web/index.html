@@ -506,6 +506,10 @@ const scope = (() => {
   const ctx = cv.getContext("2d");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let scan = [], tgt = null, t0 = performance.now(), px = 0;
+  let liveScan = null;
+  function useLive(s){
+    liveScan = s && s.length ? s.map(([a, m]) => ({a, m})) : null;
+  }
 
   /* Ray vs axis-aligned rect (slab method). Returns {tmin,tmax} or null. */
   function slab(ox, oy, dx, dy, r){
@@ -625,7 +629,7 @@ const scope = (() => {
     }
 
     ctx.fillStyle = acc;
-    for (const p of scan){
+    for (const p of (liveScan || scan)){
       let age = sweep - p.a; if (age < 0) age += 360;
       const alpha = reduce ? .75 : Math.max(0, 1 - age / 330);
       if (alpha <= .02) continue;
@@ -672,10 +676,11 @@ const scope = (() => {
     ORIGIN = {x, y}; build();
   }
   return {
-    target, setOrigin, points: () => scan,
+    target, setOrigin, points: () => liveScan || scan,
     home: () => setOrigin(HOME.x, HOME.y),
     sees: loc => !occluded(loc),
     bearing: bearingTo,
+    useLive,
   };
 })();
 
@@ -831,6 +836,32 @@ const cam = (() => {
   }
 
   let stream = null, video = null, live = false, loopId = 0, pose = null;
+  let liveDets = null, mjpeg = null;
+  const DEFAULT_NOTE = document.getElementById("cam-note").innerHTML;
+  /* Single source of truth for the note text, called wherever !live can
+     start being true: from useLive() when the backend pushes a frame, and
+     from toggleLive()'s off-branch, since turning the webcam off can also
+     reveal backend state that was already live underneath it. */
+  function syncNote(){
+    const note = document.getElementById("cam-note");
+    note.className = "camnote";
+    note.innerHTML = liveDets
+      ? "<b>Live camera, live detector.</b> Frame and boxes are both real: an "
+        + "iPhone frame over Continuity Camera, fused with an actual YOLO "
+        + "detection corroborated by lidar line of sight. No SIM tag &mdash; "
+        + "there is nothing simulated in this box."
+      : DEFAULT_NOTE;
+  }
+  function useLive(dets, ok){
+    liveDets = dets;
+    if (ok && !mjpeg){
+      mjpeg = new Image();
+      mjpeg.src = "/api/camera.mjpg";
+    }
+    if (!ok && mjpeg) { mjpeg.src = ""; mjpeg = null; }  // stop the server writing to a dead <img>
+    if (!live) syncNote();                  // webcam toggle owns the note while active
+    if (pose) paint();
+  }
 
   /* Live video is attempted, never assumed: the viewer iframe may not carry a
      camera grant at all, and the viewer may say no. Either way we fall back. */
@@ -842,9 +873,7 @@ const cam = (() => {
       if (stream) stream.getTracks().forEach(t => t.stop());
       stream = null; video = null;
       btn.textContent = "Use the real camera";
-      note.className = "camnote";
-      note.innerHTML = "Frame synthesised from the scan geometry. Boxes are ground "
-        + "truth projected through the lens &mdash; <b>not</b> a trained detector.";
+      syncNote();
       idle(); return;
     }
     btn.disabled = true; btn.textContent = "Asking\u2026";
@@ -880,6 +909,17 @@ const cam = (() => {
     ctx.drawImage(video, (W - dw) / 2, (H - dh) / 2, dw, dh);
   }
 
+  /* Cover-crop the backend's real MJPEG frame; returns the transform so real
+     detector boxes (in the frame's own pixel coordinates) line up with it. */
+  function drawMjpeg(){
+    const W = cv.width, H = cv.height;
+    const iw = mjpeg.naturalWidth || 16, ih = mjpeg.naturalHeight || 9;
+    const sc = Math.max(W / iw, H / ih), dw = iw * sc, dh = ih * sc;
+    const ox = (W - dw) / 2, oy = (H - dh) / 2;
+    ctx.drawImage(mjpeg, ox, oy, dw, dh);
+    return {sc, ox, oy};
+  }
+
   function loop(){
     if (!live) return;
     paint();
@@ -901,7 +941,14 @@ const cam = (() => {
     const yOf = (h, m) => hz + f * (CAM_H - h) / m;
 
     ctx.fillStyle = "#0b0f0d"; ctx.fillRect(0, 0, W, H);
-    if (live && video && video.readyState >= 2){
+    let mjT = null;
+    /* Gated on !live: the webcam toggle and the backend can both hold state
+       at once (useLive() never drops liveDets/mjpeg just because the toggle
+       is on, so the backend doesn't have to re-push after a toggle-back),
+       but only one may ever be drawn, and it must match cam-note's claim. */
+    if (!live && mjpeg && mjpeg.naturalWidth){    // streaming multipart <img> never fires "complete"
+      mjT = drawMjpeg();
+    } else if (live && video && video.readyState >= 2){
       drawVideo();
     } else {
       const g = ctx.createLinearGradient(0, 0, 0, H);    // ceiling -> floor
@@ -927,23 +974,43 @@ const cam = (() => {
       ctx.fillRect(x - px, yF - px, 2 * px, 2 * px);
     }
 
-    /* Boxes. */
-    for (const {it, d, m} of inFrame(p, axis)){
-      const halfW = Math.atan(OBJ_W / 2 / m) * 180 / Math.PI;
-      const x1 = xOf(d - halfW), x2 = xOf(d + halfW);
-      const yB = yOf(SHELF_H - OBJ_H / 2, m), yT = yOf(SHELF_H + OBJ_H / 2, m);
-      const conf = Math.max(.6, Math.min(.99, 1 - m * .055));
-      ctx.strokeStyle = "#6fc07a"; ctx.lineWidth = 1.6 * px;
-      ctx.strokeRect(x1, yT, x2 - x1, yB - yT);
+    /* Boxes. Real detector output (liveDets, from the backend) is drawn in the
+       frame's own pixel coordinates and never carries SIM — every other box
+       here is ground truth projected through the lens, and keeps the tag. */
+    if (!live && liveDets){
+      const t = mjT || {sc:1, ox:0, oy:0};
+      for (const dt of liveDets){
+        const x1 = dt.x1 * t.sc + t.ox, x2 = dt.x2 * t.sc + t.ox;
+        const y1 = dt.y1 * t.sc + t.oy, y2 = dt.y2 * t.sc + t.oy;
+        ctx.strokeStyle = "#6fc07a"; ctx.lineWidth = 1.6 * px;
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
 
-      const text = (live ? "SIM  " : "") + it.name.split(",")[0].slice(0, 20)
-        + "  " + conf.toFixed(2);
-      ctx.font = "600 " + Math.round(10 * px) + "px 'IBM Plex Mono',monospace";
-      const tw = ctx.measureText(text).width, th = 14 * px;
-      ctx.fillStyle = "#6fc07a";
-      ctx.fillRect(x1, Math.max(0, yT - th), tw + 8 * px, th);
-      ctx.fillStyle = "#08120c";
-      ctx.fillText(text, x1 + 4 * px, Math.max(0, yT - th) + 10.5 * px);
+        const text = (dt.cls_name || "item") + "  " + dt.conf.toFixed(2);
+        ctx.font = "600 " + Math.round(10 * px) + "px 'IBM Plex Mono',monospace";
+        const tw = ctx.measureText(text).width, th = 14 * px;
+        ctx.fillStyle = "#6fc07a";
+        ctx.fillRect(x1, Math.max(0, y1 - th), tw + 8 * px, th);
+        ctx.fillStyle = "#08120c";
+        ctx.fillText(text, x1 + 4 * px, Math.max(0, y1 - th) + 10.5 * px);
+      }
+    } else {
+      for (const {it, d, m} of inFrame(p, axis)){
+        const halfW = Math.atan(OBJ_W / 2 / m) * 180 / Math.PI;
+        const x1 = xOf(d - halfW), x2 = xOf(d + halfW);
+        const yB = yOf(SHELF_H - OBJ_H / 2, m), yT = yOf(SHELF_H + OBJ_H / 2, m);
+        const conf = Math.max(.6, Math.min(.99, 1 - m * .055));
+        ctx.strokeStyle = "#6fc07a"; ctx.lineWidth = 1.6 * px;
+        ctx.strokeRect(x1, yT, x2 - x1, yB - yT);
+
+        const text = (live ? "SIM  " : "") + it.name.split(",")[0].slice(0, 20)
+          + "  " + conf.toFixed(2);
+        ctx.font = "600 " + Math.round(10 * px) + "px 'IBM Plex Mono',monospace";
+        const tw = ctx.measureText(text).width, th = 14 * px;
+        ctx.fillStyle = "#6fc07a";
+        ctx.fillRect(x1, Math.max(0, yT - th), tw + 8 * px, th);
+        ctx.fillStyle = "#08120c";
+        ctx.fillText(text, x1 + 4 * px, Math.max(0, yT - th) + 10.5 * px);
+      }
     }
 
     if (!live){
@@ -954,7 +1021,7 @@ const cam = (() => {
     document.getElementById("cam-id").textContent = label;
     const st = document.getElementById("cam-state");
     st.textContent = rec ? "rec  " + Math.round(p.x) + "," + Math.round(p.y)
-                         : (live ? "live" : "standby");
+                         : ((live || liveDets) ? "live" : "standby");
   }
 
   /* At rest: look down the room from the parked sensor, so the panel is never blank. */
@@ -966,7 +1033,7 @@ const cam = (() => {
   size();
   addEventListener("resize", () => { size(); paint(); });
   document.getElementById("cam-live").addEventListener("click", toggleLive);
-  return {render, idle, size, inFrameCount: (p, a) => inFrame(p, a).length};
+  return {render, idle, size, useLive, inFrameCount: (p, a) => inFrame(p, a).length};
 })();
 
 /* ---------- fusion pass: a moving lidar plus two side cameras -------------
@@ -1092,6 +1159,39 @@ const pass = (() => {
 
   document.getElementById("run").addEventListener("click", run);
   return {run};
+})();
+
+/* ---------- live backend source ---------------------------------------
+   Served locally by `python -m shelf`, the page runs on measured data: the
+   scope draws real returns and the camera panel shows the real MJPEG stream
+   with real detector boxes. Opened as the published artifact there is no
+   backend, the socket never opens, and everything falls back to the
+   synthetic ray-cast unchanged. Same-origin only: the page is always opened
+   from the server that would serve the socket, so no host is hardcoded.  */
+const backend = (() => {
+  let ws = null, delay = 1000, timer = null;
+  const MAX_DELAY = 15000;
+  function connect(){
+    if (!location.origin.startsWith("http") || location.origin.includes("claude.ai"))
+      return;                                  // published artifact: stay synthetic
+    const scheme = location.protocol === "https:" ? "wss://" : "ws://";
+    ws = new WebSocket(scheme + location.host + "/ws/live");
+    ws.onopen = () => { delay = 1000; };        // reconnect succeeded: reset backoff
+    ws.onmessage = ev => {
+      let live;
+      try { live = JSON.parse(ev.data); } catch (e) { return; }
+      scope.useLive(live.scan);
+      cam.useLive(live.detections, live.camera_ok);
+    };
+    ws.onclose = () => {
+      scope.useLive(null); cam.useLive(null, false);
+      if (timer) return;                        // a retry is already scheduled
+      timer = setTimeout(() => { timer = null; connect(); }, delay);
+      delay = Math.min(delay * 2, MAX_DELAY);
+    };
+    ws.onerror = () => { try { ws.close(); } catch (e) {} };
+  }
+  connect();
 })();
 
 /* ---------- boot ---------- */
