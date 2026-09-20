@@ -6,7 +6,7 @@ Status: approved, not yet implemented
 ## What this builds
 
 A local service that turns a real RPLIDAR C1 and a real iPhone camera into
-inventory sightings, and serves the existing Shelf Memory page against live data
+inventory sightings, and serves the existing ScanAI page against live data
 instead of a synthetic ray-cast.
 
 The camera says **what** an object is and **which direction** it lies. The lidar

@@ -1,4 +1,4 @@
-# Shelf Memory
+# ScanAI
 
 Ask where something is. The index answers from the last time a sensor actually
 saw it, and says how stale that memory is.
