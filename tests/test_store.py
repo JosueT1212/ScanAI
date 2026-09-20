@@ -36,18 +36,28 @@ def test_stations_round_trip(tmp_path):
 
 
 def test_concurrent_sightings_of_one_class_make_one_item(tmp_path):
-    """Task 6 writes from the capture thread; check-then-act would duplicate."""
+    """Task 6 writes from the capture thread; check-then-act would duplicate.
+
+    Asserting on row count alone is not enough: unlocked, the likely failure is
+    an IntegrityError from two threads minting the same millisecond-based id,
+    which kills one worker silently and still leaves exactly one row.
+    """
     import threading
     s = make(tmp_path)
     barrier = threading.Barrier(8)
+    errors = []
 
     def worker():
         barrier.wait()                      # maximise the overlap
-        s.record_sighting(Sighting("cup", 0.9, 10.0, 2.0, 12.0, 30.0))
+        try:
+            s.record_sighting(Sighting("cup", 0.9, 10.0, 2.0, 12.0, 30.0))
+        except Exception as e:              # noqa: BLE001 - the point is to see any
+            errors.append(e)
 
     threads = [threading.Thread(target=worker) for _ in range(8)]
     for t in threads: t.start()
     for t in threads: t.join()
+    assert errors == [], f"worker raised: {errors!r}"
     assert len(s.items()) == 1
 
 
