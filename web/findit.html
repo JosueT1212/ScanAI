@@ -1,0 +1,1120 @@
+<title>Shelf Memory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ground:#eceee9; --surface:#fbfcfa; --surface-2:#e3e7e1;
+    --ink:#171a18; --ink-2:#4d554f; --ink-3:#7b837d;
+    --line:#d2d7cf; --line-2:#c0c7bd;
+    --accent:#0f6d63; --accent-soft:#dcebe7; --accent-ink:#0a4f47;
+    --fresh:#2f7a3e; --fresh-soft:#dfeede;
+    --stale:#8a6508; --stale-soft:#f4e9cd;
+    --cold:#a13030; --cold-soft:#f5dfdd;
+    --shadow:0 1px 2px rgba(23,26,24,.06),0 6px 18px -10px rgba(23,26,24,.22);
+    --r:10px;
+    --display:'Archivo',system-ui,sans-serif;
+    --body:'IBM Plex Sans',system-ui,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ground:#12150f; --surface:#1a1e19; --surface-2:#232823;
+      --ink:#e9ece7; --ink-2:#a8b1a8; --ink-3:#7d867d;
+      --line:#2d332d; --line-2:#3b423b;
+      --accent:#4fbcae; --accent-soft:#16302d; --accent-ink:#8fd8cd;
+      --fresh:#6fc07a; --fresh-soft:#18301b;
+      --stale:#d9ab3d; --stale-soft:#332a10;
+      --cold:#e07a72; --cold-soft:#331c1a;
+      --shadow:0 1px 2px rgba(0,0,0,.5),0 6px 18px -10px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#12150f; --surface:#1a1e19; --surface-2:#232823;
+    --ink:#e9ece7; --ink-2:#a8b1a8; --ink-3:#7d867d;
+    --line:#2d332d; --line-2:#3b423b;
+    --accent:#4fbcae; --accent-soft:#16302d; --accent-ink:#8fd8cd;
+    --fresh:#6fc07a; --fresh-soft:#18301b;
+    --stale:#d9ab3d; --stale-soft:#332a10;
+    --cold:#e07a72; --cold-soft:#331c1a;
+    --shadow:0 1px 2px rgba(0,0,0,.5),0 6px 18px -10px rgba(0,0,0,.8);
+  }
+
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);font-family:var(--body);
+       font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1140px;margin:0 auto;padding-inline:20px;padding-block:28px 56px}
+  h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+
+  header.top{display:flex;flex-wrap:wrap;gap:16px 24px;align-items:flex-end;
+             justify-content:space-between;margin-bottom:22px}
+  .brand h1{font-size:26px;font-weight:700}
+  .brand p{margin:5px 0 0;color:var(--ink-2);font-size:14px;max-width:52ch}
+  .stats{display:flex;gap:22px;font-family:var(--mono);font-size:12px;
+         color:var(--ink-2);font-variant-numeric:tabular-nums}
+  .stats b{display:block;font-size:19px;color:var(--ink);font-weight:600}
+
+  /* ---- query bar ---- */
+  form.ask{display:flex;gap:10px;margin-bottom:8px}
+  .ask input{flex:1;min-width:0;font:500 17px/1.3 var(--body);color:var(--ink);
+    background:var(--surface);border:1.5px solid var(--line-2);border-radius:var(--r);
+    padding:15px 16px;box-shadow:var(--shadow)}
+  .ask input::placeholder{color:var(--ink-3);font-weight:400}
+  .ask input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+  .ask button{font:600 15px var(--body);background:var(--accent);color:#fff;border:0;
+    border-radius:var(--r);padding:0 22px;cursor:pointer}
+  .ask button:hover{background:var(--accent-ink)}
+  :root[data-theme="dark"] .ask button,
+  :root:not([data-theme="light"]) .ask button{color:#0c1512}
+  @media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .ask button{color:#fff}}
+
+  .examples{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 26px;padding:0;list-style:none}
+  .examples button{font:400 12.5px var(--body);color:var(--ink-2);background:transparent;
+    border:1px solid var(--line-2);border-radius:99px;padding:5px 11px;cursor:pointer}
+  .examples button:hover{border-color:var(--accent);color:var(--accent-ink)}
+  :root[data-theme="dark"] .examples button:hover{color:var(--accent)}
+
+  /* ---- main grid ---- */
+  .cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:24px;align-items:start}
+  @media (max-width:860px){.cols{grid-template-columns:1fr}}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+         padding:20px;box-shadow:var(--shadow)}
+  .panel + .panel{margin-top:18px}
+  .panel h2{font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+            color:var(--ink-3);margin-bottom:14px}
+
+  /* ---- answer ---- */
+  .answer{border-left:4px solid var(--accent);background:var(--accent-soft);
+          border-radius:8px;padding:16px 18px;margin-bottom:6px}
+  .answer .name{font-family:var(--display);font-size:21px;font-weight:600;line-height:1.25}
+  .answer .where{margin:9px 0 0;font-size:15px;color:var(--ink)}
+  .answer .code{font-family:var(--mono);font-weight:600;font-size:13px;
+    background:var(--surface);border:1px solid var(--line-2);border-radius:5px;padding:2px 7px}
+  .answer .caveat{margin:11px 0 0;font-size:13.5px;color:var(--ink-2);max-width:60ch}
+
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+  .chip{display:inline-flex;align-items:center;gap:6px;font:500 12px var(--mono);
+    border-radius:99px;padding:4px 10px;border:1px solid transparent;
+    font-variant-numeric:tabular-nums}
+  .chip.fresh{background:var(--fresh-soft);color:var(--fresh);border-color:var(--fresh)}
+  .chip.stale{background:var(--stale-soft);color:var(--stale);border-color:var(--stale)}
+  .chip.cold{background:var(--cold-soft);color:var(--cold);border-color:var(--cold)}
+  .chip.plain{background:var(--surface-2);color:var(--ink-2);border-color:var(--line-2)}
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+
+  .conf{display:flex;align-items:center;gap:8px;font:500 12px var(--mono);color:var(--ink-2)}
+  .bar{width:64px;height:5px;border-radius:3px;background:var(--surface-2);overflow:hidden;flex:none}
+  .bar i{display:block;height:100%;border-radius:3px;background:var(--accent)}
+
+  /* ---- alternates ---- */
+  ul.alts{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:2px}
+  ul.alts li{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+    padding:11px 4px;border-top:1px solid var(--line)}
+  ul.alts .n{font-weight:500}
+  ul.alts .l{font-family:var(--mono);font-size:12px;color:var(--ink-2);display:block;margin-top:2px}
+  .empty{color:var(--ink-2);font-size:14.5px;max-width:58ch}
+
+  /* ---- floorplan ---- */
+  .plan{width:100%;height:auto;display:block;border-radius:8px;background:var(--surface-2)}
+  .zone{fill:var(--surface);stroke:var(--line-2);stroke-width:.5}
+  .zlabel{font-family:var(--mono);font-size:2.6px;fill:var(--ink-3);letter-spacing:.14em}
+  .bench{fill:var(--surface-2);stroke:var(--line-2);stroke-width:.4}
+  .loc{fill:var(--line-2)}
+  .loc.on{fill:var(--accent)}
+  .pulse{fill:none;stroke:var(--accent);stroke-width:1}
+  .lcode{font-family:var(--mono);font-size:2.5px;fill:var(--ink-2)}
+  .lcode.on{fill:var(--accent-ink);font-weight:600}
+  :root[data-theme="dark"] .lcode.on{fill:var(--accent)}
+  .fov{fill:var(--accent);opacity:.13}
+  .pod{fill:var(--accent)}
+  .podring{fill:none;stroke:var(--accent);stroke-width:.5;opacity:.6}
+  .ray{stroke:var(--fresh);stroke-width:.4;opacity:.75}
+  .hit{fill:none;stroke:var(--fresh);stroke-width:.6}
+  .hitlabel{font-family:var(--mono);font-size:2.4px;fill:var(--fresh);font-weight:600}
+  .progress{height:4px;border-radius:2px;background:var(--surface-2);overflow:hidden;margin-top:12px}
+  .progress i{display:block;height:100%;background:var(--accent);width:0;
+    transition:width .18s linear}
+  .passline{margin-top:9px;font-family:var(--mono);font-size:11.5px;color:var(--ink-2);
+    font-variant-numeric:tabular-nums}
+  .passline b{color:var(--ink);font-weight:600}
+  @keyframes ping{from{r:2.5;opacity:.9}to{r:8;opacity:0}}
+  .pulse.on{animation:ping 1.8s ease-out infinite}
+  @media (prefers-reduced-motion:reduce){.pulse.on{animation:none;opacity:.5;r:6}}
+
+  /* ---- camera feed ---- */
+  .cam{position:relative;width:100%;aspect-ratio:16/9;border-radius:9px;overflow:hidden;
+       background:#0b0f0d}
+  .cam canvas{width:100%;height:100%;display:block}
+  .camhud{position:absolute;inset:0;pointer-events:none;
+    display:flex;justify-content:space-between;align-items:flex-start;
+    padding:9px 11px;font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;
+    color:#8fd8cd;text-transform:uppercase}
+  .camhud .rec{display:inline-flex;align-items:center;gap:5px;color:#e07a72}
+  .camhud .rec i{width:6px;height:6px;border-radius:50%;background:currentColor;
+    animation:blink 1.4s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  @media (prefers-reduced-motion:reduce){.camhud .rec i{animation:none}}
+  .camnote{margin:9px 0 0;font-size:12.5px;color:var(--ink-3);max-width:62ch}
+  .camnote.warn{color:var(--stale)}
+  .camband{position:absolute;left:0;right:0;bottom:0;padding:5px 11px;
+    background:rgba(138,101,8,.92);color:#fff;font-family:var(--mono);font-size:10px;
+    letter-spacing:.1em;text-transform:uppercase;text-align:center}
+
+  /* ---- lidar scope ---- */
+  .scope{position:relative;width:100%;aspect-ratio:1/1;max-width:100%}
+  .scope canvas{width:100%;height:100%;display:block;border-radius:10px;
+    background:var(--surface-2)}
+  .readout{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:baseline;
+    margin-top:11px;font-family:var(--mono);font-size:12px;color:var(--ink-2);
+    font-variant-numeric:tabular-nums}
+  .readout .pos{letter-spacing:.02em}
+  .readout .pos b{color:var(--ink);font-weight:600}
+  .readout .state{font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:11px}
+  .readout .state.lock{color:var(--fresh)}
+  .readout .state.blind{color:var(--stale)}
+  .readout .state.idle{color:var(--ink-3)}
+  .specs{margin:9px 0 0;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);
+    letter-spacing:.04em;line-height:1.6}
+
+  /* ---- feed ---- */
+  ul.feed{list-style:none;margin:0;padding:0;display:grid;gap:0;
+          max-height:230px;overflow-y:auto}
+  ul.feed li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;
+    padding:9px 2px;border-bottom:1px solid var(--line);font-size:13.5px}
+  ul.feed li:last-child{border-bottom:0}
+  ul.feed .src{font:500 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-3);border:1px solid var(--line-2);border-radius:4px;padding:1px 5px}
+  ul.feed time{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);white-space:nowrap}
+
+  /* ---- controls ---- */
+  .row{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}
+  .btn{font:500 13.5px var(--body);background:var(--surface);color:var(--ink);
+    border:1px solid var(--line-2);border-radius:8px;padding:9px 14px;cursor:pointer}
+  .btn:hover{border-color:var(--accent);color:var(--accent-ink)}
+  :root[data-theme="dark"] .btn:hover{color:var(--accent)}
+  .btn[disabled]{opacity:.5;cursor:default}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  :root[data-theme="dark"] .btn.primary{color:#0c1512}
+
+  .addform{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:4px}
+  .addform label{font:500 11px var(--mono);letter-spacing:.07em;text-transform:uppercase;
+    color:var(--ink-3);display:block;margin-bottom:4px}
+  .addform input,.addform select{width:100%;font:400 14px var(--body);color:var(--ink);
+    background:var(--ground);border:1px solid var(--line-2);border-radius:7px;padding:9px 10px}
+  .addform .full{grid-column:1/-1}
+  .addform input:focus,.addform select:focus{outline:2px solid var(--accent);outline-offset:1px}
+
+  .note{margin:26px 0 0;padding:16px 18px;border:1px dashed var(--line-2);border-radius:12px;
+        color:var(--ink-2);font-size:13.5px;max-width:76ch}
+  .note b{color:var(--ink);font-weight:600}
+  .live{font:500 11px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Shelf Memory</h1>
+      <p>Ask where something is. The index answers from the last time a sensor
+         actually saw it &mdash; and tells you how stale that memory is.</p>
+    </div>
+    <div class="stats">
+      <div><b id="s-items">&mdash;</b>items tracked</div>
+      <div><b id="s-stale">&mdash;</b>need re-scan</div>
+      <div><b id="s-mode" class="live">local</b>index</div>
+    </div>
+  </header>
+
+  <form class="ask" id="ask">
+    <input id="q" type="text" autocomplete="off" spellcheck="false"
+           placeholder="Where are the jumper wires?" aria-label="Ask where an item is">
+    <button type="submit">Find</button>
+  </form>
+  <ul class="examples" id="examples"></ul>
+
+  <div class="cols">
+    <div>
+      <section class="panel">
+        <h2>Camera &mdash; pod mast</h2>
+        <div class="cam">
+          <canvas id="cam"></canvas>
+          <div class="camhud">
+            <span id="cam-id">CAM-L</span>
+            <span class="rec"><i></i><span id="cam-state">standby</span></span>
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn" id="cam-live">Use the real camera</button>
+        </div>
+        <p class="camnote" id="cam-note">Frame synthesised from the scan geometry.
+          Boxes are ground truth projected through the lens &mdash; <b>not</b> a
+          trained detector. A real build puts a model here; the plumbing around it
+          is what this shows.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Answer</h2>
+        <div id="result"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Sighting feed</h2>
+        <ul class="feed" id="feed"></ul>
+        <div class="row">
+          <button class="btn primary" id="sim">Simulate a camera sighting</button>
+          <button class="btn" id="reseed">Reset inventory</button>
+        </div>
+      </section>
+    </div>
+
+    <div>
+      <section class="panel">
+        <h2>LiDAR scan &mdash; RPLIDAR C1</h2>
+        <div class="scope"><canvas id="scope"></canvas></div>
+        <div class="readout">
+          <span class="pos" id="ro-pos">Awaiting a query</span>
+          <span class="state idle" id="ro-state">standby</span>
+        </div>
+        <p class="specs" id="specs">
+          360&deg; &middot; 0.72&deg; step &middot; 500 pts/rev &middot; 12 m &middot; single plane
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>Floor plan &mdash; Building 4, Level 2</h2>
+        <svg class="plan" viewBox="0 0 100 68" role="img" aria-labelledby="plantitle">
+          <title id="plantitle">Makerspace floor plan with storage locations</title>
+          <g id="zones"></g>
+          <g id="pod"></g>
+          <g id="dots"></g>
+        </svg>
+        <div class="progress"><i id="pass-bar"></i></div>
+        <div class="passline" id="pass-line">Pod idle. Run a pass to sweep the floor.</div>
+        <div class="row">
+          <button class="btn primary" id="run">Run a scan pass</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Log an item by hand</h2>
+        <form class="addform" id="add">
+          <div class="full">
+            <label for="a-name">Item</label>
+            <input id="a-name" required placeholder="Oscilloscope probes">
+          </div>
+          <div class="full">
+            <label for="a-tags">Also called</label>
+            <input id="a-tags" placeholder="probe, scope, tektronix">
+          </div>
+          <div>
+            <label for="a-loc">Location</label>
+            <select id="a-loc"></select>
+          </div>
+          <div>
+            <label for="a-qty">Quantity</label>
+            <input id="a-qty" type="number" min="1" value="1">
+          </div>
+          <div class="full">
+            <button class="btn primary" type="submit">Add to index</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <p class="note">
+    <b>What is real here.</b> The index, the ranking, the staleness decay and the
+    shared store are live &mdash; every viewer of this page sees the same inventory,
+    and edits persist. <b>The sensors are not.</b> Sightings are simulated, and the
+    scan above is ray-cast against the floor plan rather than measured &mdash; at the
+    C1's real parameters, slowed from 10&nbsp;Hz so the sweep is legible.
+    <b>Its occlusion is not faked.</b> When a bench stands between the sensor and the
+    target, the scope reports no line of sight, because a single-plane scanner genuinely
+    cannot see past it. That is the argument in one frame: LiDAR gives geometry but
+    cannot name an object, a camera names objects but places them poorly, and neither
+    sees behind a box. Until both run together, an honest index reports
+    <em>when it last knew</em> rather than pretending to know now.
+  </p>
+</div>
+
+<script>
+const LOCATIONS = [
+  {id:"ELEC-A",  name:"Shelf A, Electronics Bench",   zone:"Electronics", x:15, y:17},
+  {id:"ELEC-B",  name:"Bin Wall B, Electronics Bench",zone:"Electronics", x:34, y:17},
+  {id:"FAB-1",   name:"Tool Chest 1, Fabrication",    zone:"Fabrication", x:67, y:17},
+  {id:"FAB-2",   name:"Under-bench Rack, Fabrication",zone:"Fabrication", x:86, y:17},
+  {id:"STOR-C",  name:"Storage Wall, Row C",          zone:"Storage",     x:15, y:52},
+  {id:"STOR-D",  name:"Storage Wall, Row D",          zone:"Storage",     x:34, y:52},
+  {id:"CLASS-1", name:"Supply Cabinet, Classroom",    zone:"Classroom",   x:67, y:52},
+  {id:"CHRG-1",  name:"Charging Station, Classroom",  zone:"Classroom",   x:86, y:52},
+];
+const ZONES = [
+  {name:"ELECTRONICS", x:4,  y:6,  w:44, h:26},
+  {name:"FABRICATION", x:52, y:6,  w:44, h:26},
+  {name:"STORAGE",     x:4,  y:38, w:44, h:26},
+  {name:"CLASSROOM",   x:52, y:38, w:44, h:26},
+];
+/* Benches and racks. Not the zones themselves — the zones are open floor and the
+   locations sit inside them. These are what a single-plane scanner actually hits,
+   and what it cannot see past. */
+const BENCHES = [
+  {x:18, y:22, w:16, h:5},   // electronics bench  -> hides ELEC-A
+  {x:74, y:22, w:14, h:5},   // fabrication bench  -> hides FAB-2
+  {x:20, y:41, w:16, h:5},   // storage rack       -> hides STOR-C
+  {x:56, y:45, w:13, h:5},   // classroom table    -> hides CLASS-1
+];
+const LOC = Object.fromEntries(LOCATIONS.map(l => [l.id, l]));
+
+/* Used only when the shared store is unreachable, so the page still answers. */
+const FALLBACK = [
+  ["Dupont jumper wires, M-F","jumper dupont wire cable breadboard","ELEC-B",6,1,.94],
+  ["Soldering iron, Hakko FX-888D","solder iron hakko station","ELEC-A",2,3,.88],
+  ["Resistor kit, 1/4W","resistor kit passive ohm","ELEC-B",3,12,.71],
+  ["Digital calipers","caliper measure mitutoyo vernier","FAB-1",2,5,.90],
+  ["M3 hex standoffs","standoff m3 hardware screw spacer","STOR-C",400,41,.42],
+  ["USB-C cables, 1m","usb cable charger type-c cord","CHRG-1",9,0,.97],
+  ["Raspberry Pi 5, 8GB","pi raspberry sbc computer board","STOR-D",4,9,.83],
+  ["ESP32-S3-BOX-3","esp32 box espressif dev board devkit","ELEC-A",1,0,.96],
+  ["Heat gun","heat gun shrink hot air","FAB-2",1,27,.55],
+  ["Safety glasses","safety glasses ppe goggles eye","CLASS-1",24,1,.93],
+  ["PLA filament, black 1kg","filament pla spool 3d print","FAB-2",7,6,.86],
+  ["Multimeter, Fluke 117","multimeter fluke dmm meter voltage","ELEC-A",3,4,.91],
+  ["Hot glue gun","glue hot adhesive stick","CLASS-1",5,33,.48],
+  ["Breadboards, 830pt","breadboard protoboard prototyping","ELEC-B",12,2,.92],
+  ["18650 battery packs","battery 18650 lipo power cell","STOR-C",8,15,.66],
+].map(([name,tags,locationId,qty,days,confidence],i) => ({
+  id:"itm"+i, name, tags:tags.split(" "), locationId, qty, confidence,
+  lastSeenAt:new Date(Date.now()-days*864e5).toISOString(), source:"camera",
+}));
+
+const STOP = new Set(("where is are the my a an i can you do know find locate "+
+  "whats what s of in on at to me our we did put left last seen have has").split(" "));
+const DAY = 864e5;
+
+let db = null, items = [], feed = [], hi = null, ready = false;
+
+/* ---------- helpers ---------- */
+const daysSince = it => (Date.now() - new Date(it.lastSeenAt).getTime()) / DAY;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function freshness(it){
+  const d = daysSince(it);
+  if (d > 60) return {k:"cold",  label:"unverified", d};
+  if (d > 21) return {k:"stale", label:"going stale", d};
+  return {k:"fresh", label:"recently seen", d};
+}
+function ago(ts){
+  const m = (Date.now() - new Date(ts).getTime()) / 6e4;
+  if (m < 1) return "just now";
+  if (m < 60) return Math.round(m) + " min ago";
+  const h = m / 60;
+  if (h < 24) return Math.round(h) + (Math.round(h) === 1 ? " hour ago" : " hours ago");
+  const d = Math.round(h / 24);
+  return d === 1 ? "yesterday" : d + " days ago";
+}
+
+/* ---------- search: keyword scoring, no embeddings ---------- */
+function search(raw){
+  const toks = raw.toLowerCase().replace(/[^a-z0-9 -]/g," ").split(/\s+/)
+    .filter(t => t && !STOP.has(t));
+  if (!toks.length) return [];
+  const phrase = toks.join(" ");
+  return items.map(it => {
+    const name = it.name.toLowerCase(), tags = (it.tags||[]).join(" ");
+    let s = 0;
+    if (name.includes(phrase)) s += 12;
+    for (const t of toks){
+      if (name.includes(t)) s += 6;
+      else if (tags.includes(t)) s += 4;
+      else if (t.length > 3 && (name.includes(t.slice(0,-1)) || tags.includes(t.slice(0,-1)))) s += 2;
+      if ((it.locationId||"").toLowerCase().includes(t)) s += 1;
+    }
+    /* A confident, recent sighting outranks a stale one on a tie. */
+    if (s) s += it.confidence - Math.min(daysSince(it), 90) / 90;
+    return {it, s};
+  }).filter(r => r.s > 0).sort((a,b) => b.s - a.s);
+}
+
+/* ---------- rendering ---------- */
+function renderResult(q){
+  const box = document.getElementById("result");
+  if (!q.trim()){
+    box.innerHTML = '<p class="empty">Ask for something by name, or by whatever you '
+      + 'actually call it &mdash; &ldquo;dupont&rdquo; finds the jumper wires.</p>';
+    setHighlight(null); return;
+  }
+  const hits = search(q);
+  if (!hits.length){
+    box.innerHTML = '<p class="empty">Nothing in the index matches <b>' + esc(q)
+      + '</b>. Either it was never logged, or it is here under another name. '
+      + 'Add it below and the next scan will confirm it.</p>';
+    setHighlight(null); return;
+  }
+  const top = hits[0].it, f = freshness(top), l = LOC[top.locationId];
+  const caveat = f.k === "fresh"
+    ? "Confirmed by the last scan of that shelf."
+    : f.k === "stale"
+      ? "Nobody has seen it there in " + Math.round(f.d) + " days. Treat the location as a strong guess, not a fact."
+      : "Last confirmed " + Math.round(f.d) + " days ago. Likely moved — this needs a re-scan before you trust it.";
+
+  box.innerHTML =
+    '<div class="answer">'
+    + '<div class="name">' + esc(top.name) + '</div>'
+    + '<p class="where">' + esc(l ? l.name : "Unknown location")
+      + ' &nbsp;<span class="code">' + esc(top.locationId) + '</span></p>'
+    + '<div class="meta">'
+      + '<span class="chip ' + f.k + '"><span class="dot"></span>' + esc(ago(top.lastSeenAt)) + '</span>'
+      + '<span class="chip plain">qty ' + esc(top.qty) + '</span>'
+      + '<span class="conf"><span class="bar"><i style="width:'
+        + Math.round(top.confidence * 100) + '%"></i></span>'
+        + Math.round(top.confidence * 100) + '% match confidence</span>'
+    + '</div>'
+    + '<p class="caveat">' + caveat + '</p>'
+    + '</div>'
+    + (hits.length > 1
+        ? '<ul class="alts">' + hits.slice(1, 5).map(h => {
+            const g = freshness(h.it);
+            return '<li><span><span class="n">' + esc(h.it.name) + '</span>'
+              + '<span class="l">' + esc(h.it.locationId) + ' &middot; '
+              + esc(LOC[h.it.locationId] ? LOC[h.it.locationId].zone : "?") + '</span></span>'
+              + '<span class="chip ' + g.k + '"><span class="dot"></span>'
+              + esc(ago(h.it.lastSeenAt)) + '</span></li>';
+          }).join("") + '</ul>'
+        : "");
+  setHighlight(top.locationId);
+}
+
+function setHighlight(locId){ hi = locId; drawDots(); scope.target(locId); }
+
+/* ---------- simulated LiDAR scope ----------------------------------------
+   A real 2D ray-cast against the room geometry, at the C1's own parameters:
+   0.72 degrees per step, 500 returns per revolution, 12 m ceiling, one plane.
+   Bearing 0 is up, increasing clockwise, matching the unit's own convention.
+   The returns are synthetic. The occlusion they show is not faked: a target
+   behind a bench really is invisible to a single-plane scanner, which is the
+   whole argument for fusing this with a camera.                           */
+const scope = (() => {
+  const HOME = {x:50, y:34};          // cross-aisle, floor-plan units
+  let ORIGIN = {x:HOME.x, y:HOME.y};  // moves with the pod during a pass
+  const M_PER_UNIT = 0.2;             // 100 x 68 units -> 20.0 x 13.6 m
+  const MAX_M = 12, STEP_DEG = 0.72, N = Math.round(360 / STEP_DEG);
+  const ROOM = {x:0.6, y:0.6, w:98.8, h:66.8};
+  const BLOCKS = BENCHES;
+  const REV_MS = 2600;                // slowed from 10 Hz so the sweep reads
+
+  const cv = document.getElementById("scope");
+  const ctx = cv.getContext("2d");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let scan = [], tgt = null, t0 = performance.now(), px = 0;
+
+  /* Ray vs axis-aligned rect (slab method). Returns {tmin,tmax} or null. */
+  function slab(ox, oy, dx, dy, r){
+    const ix = 1 / (dx || 1e-9), iy = 1 / (dy || 1e-9);
+    let t1 = (r.x - ox) * ix, t2 = (r.x + r.w - ox) * ix;
+    let tmin = Math.min(t1, t2), tmax = Math.max(t1, t2);
+    t1 = (r.y - oy) * iy; t2 = (r.y + r.h - oy) * iy;
+    tmin = Math.max(tmin, Math.min(t1, t2));
+    tmax = Math.min(tmax, Math.max(t1, t2));
+    return tmax < Math.max(tmin, 0) ? null : {tmin, tmax};
+  }
+  /* Nearest surface along a ray from the sensor, in floor-plan units. */
+  function cast(ox, oy, dx, dy){
+    let best = Infinity;
+    const outer = slab(ox, oy, dx, dy, ROOM);
+    if (outer) best = outer.tmax;                 // sensor is inside: exit wall
+    for (const b of BLOCKS){
+      const s = slab(ox, oy, dx, dy, b);
+      if (s && s.tmin > .001 && s.tmin < best) best = s.tmin;
+    }
+    return best;
+  }
+  function build(){
+    scan = [];
+    for (let i = 0; i < N; i++){
+      const a = i * STEP_DEG, rad = a * Math.PI / 180;
+      const dx = Math.sin(rad), dy = -Math.cos(rad);
+      let m = cast(ORIGIN.x, ORIGIN.y, dx, dy) * M_PER_UNIT;
+      if (m > MAX_M) continue;
+      /* The C1 drops the occasional return, more often off dark surfaces. */
+      if (Math.random() < (m > 6 ? .07 : .02)) continue;
+      scan.push({a, m: m * (1 + (Math.random() - .5) * .004)});   // +/- 30 mm
+    }
+  }
+
+  function bearingTo(loc){
+    const dx = loc.x - ORIGIN.x, dy = loc.y - ORIGIN.y;
+    let a = Math.atan2(dx, -dy) * 180 / Math.PI;
+    if (a < 0) a += 360;
+    return {a, m: Math.hypot(dx, dy) * M_PER_UNIT};
+  }
+  function occluded(loc){
+    const dx = loc.x - ORIGIN.x, dy = loc.y - ORIGIN.y;
+    const len = Math.hypot(dx, dy);
+    if (!len) return false;
+    const hit = cast(ORIGIN.x, ORIGIN.y, dx / len, dy / len);
+    return hit < len - .5;
+  }
+
+  function target(locId){
+    const l = locId ? LOC[locId] : null;
+    if (!l){ tgt = null; say("Awaiting a query", "standby", "idle"); return; }
+    const {a, m} = bearingTo(l);
+    const blind = occluded(l);
+    tgt = {x:l.x, y:l.y, a, m, blind, id:l.id};
+    const brg = String(Math.round(a)).padStart(3, "0");
+    say("BRG <b>" + brg + "&deg;</b> &nbsp; RNG <b>" + m.toFixed(1) + " m</b> &nbsp; " + l.id,
+        blind ? "no line of sight" : "target acquired",
+        blind ? "blind" : "lock");
+    document.getElementById("specs").innerHTML = blind
+      ? "Bench between sensor and target &mdash; position is from the last sighting, not this scan."
+      : "360&deg; &middot; 0.72&deg; step &middot; 500 pts/rev &middot; 12 m &middot; single plane";
+  }
+  function say(pos, state, cls){
+    document.getElementById("ro-pos").innerHTML = pos;
+    const el = document.getElementById("ro-state");
+    el.textContent = state; el.className = "state " + cls;
+  }
+
+  function size(){
+    const w = cv.clientWidth || 300;
+    px = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = Math.round(w * px); cv.height = Math.round(w * px);
+  }
+
+  function draw(now){
+    const v = getComputedStyle(document.documentElement);
+    const ink3 = v.getPropertyValue("--ink-3").trim();
+    const line = v.getPropertyValue("--line-2").trim();
+    const acc  = v.getPropertyValue("--accent").trim();
+    const warn = v.getPropertyValue("--stale").trim();
+    const S = cv.width, c = S / 2, R = c * .88, PPM = R / MAX_M;
+
+    ctx.clearRect(0, 0, S, S);
+    ctx.save(); ctx.translate(c, c);
+
+    ctx.strokeStyle = line; ctx.lineWidth = px;
+    for (let m = 3; m <= MAX_M; m += 3){
+      ctx.beginPath(); ctx.arc(0, 0, m * PPM, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = ink3; ctx.font = (9 * px) + "px 'IBM Plex Mono',monospace";
+      ctx.fillText(m + "m", 3 * px, -m * PPM - 3 * px);
+    }
+    ctx.beginPath();
+    ctx.moveTo(-R, 0); ctx.lineTo(R, 0); ctx.moveTo(0, -R); ctx.lineTo(0, R);
+    ctx.stroke();
+    ctx.fillStyle = ink3; ctx.font = (9 * px) + "px 'IBM Plex Mono',monospace";
+    ctx.textAlign = "center";
+    [["000", 0], ["090", 90], ["180", 180], ["270", 270]].forEach(([t, a]) => {
+      const rad = a * Math.PI / 180;
+      ctx.fillText(t, Math.sin(rad) * (R + 9 * px), -Math.cos(rad) * (R + 9 * px) + 3 * px);
+    });
+    ctx.textAlign = "left";
+
+    const sweep = reduce ? 360 : ((now - t0) % REV_MS) / REV_MS * 360;
+
+    if (!reduce){                                   // trailing wedge
+      const rad = sweep * Math.PI / 180;
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+      g.addColorStop(0, acc + "00"); g.addColorStop(1, acc + "26");
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.moveTo(0, 0);
+      ctx.arc(0, 0, R, rad - Math.PI / 2 - .5, rad - Math.PI / 2);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = acc; ctx.lineWidth = px;
+      ctx.beginPath(); ctx.moveTo(0, 0);
+      ctx.lineTo(Math.sin(rad) * R, -Math.cos(rad) * R); ctx.stroke();
+    }
+
+    ctx.fillStyle = acc;
+    for (const p of scan){
+      let age = sweep - p.a; if (age < 0) age += 360;
+      const alpha = reduce ? .75 : Math.max(0, 1 - age / 330);
+      if (alpha <= .02) continue;
+      const rad = p.a * Math.PI / 180, d = p.m * PPM;
+      ctx.globalAlpha = alpha * .85;
+      ctx.beginPath();
+      ctx.arc(Math.sin(rad) * d, -Math.cos(rad) * d, 1.35 * px, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    if (tgt){
+      const rad = tgt.a * Math.PI / 180, d = Math.min(tgt.m, MAX_M) * PPM;
+      const tx = Math.sin(rad) * d, ty = -Math.cos(rad) * d;
+      ctx.strokeStyle = tgt.blind ? warn : acc;
+      ctx.lineWidth = 1.6 * px;
+      ctx.setLineDash(tgt.blind ? [3 * px, 3 * px] : []);
+      ctx.beginPath(); ctx.arc(tx, ty, 7 * px, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(tx - 11 * px, ty); ctx.lineTo(tx - 8 * px, ty);
+      ctx.moveTo(tx + 8 * px, ty);  ctx.lineTo(tx + 11 * px, ty);
+      ctx.moveTo(tx, ty - 11 * px); ctx.lineTo(tx, ty - 8 * px);
+      ctx.moveTo(tx, ty + 8 * px);  ctx.lineTo(tx, ty + 11 * px);
+      ctx.stroke();
+      ctx.fillStyle = tgt.blind ? warn : acc;
+      ctx.font = "600 " + (9 * px) + "px 'IBM Plex Mono',monospace";
+      ctx.fillText(tgt.id, tx + 13 * px, ty + 3 * px);
+    }
+
+    ctx.fillStyle = ink3;                            // the sensor itself
+    ctx.beginPath(); ctx.arc(0, 0, 2.2 * px, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    requestAnimationFrame(draw);
+  }
+
+  size(); build();
+  addEventListener("resize", size);
+  requestAnimationFrame(draw);
+
+  /* The pass drives the sensor around; everything re-casts from the new origin. */
+  function setOrigin(x, y){
+    if (x === ORIGIN.x && y === ORIGIN.y) return;
+    ORIGIN = {x, y}; build();
+  }
+  return {
+    target, setOrigin, points: () => scan,
+    home: () => setOrigin(HOME.x, HOME.y),
+    sees: loc => !occluded(loc),
+    bearing: bearingTo,
+  };
+})();
+
+function drawPlan(){
+  document.getElementById("zones").innerHTML = ZONES.map(z =>
+    '<rect class="zone" x="' + z.x + '" y="' + z.y + '" width="' + z.w
+    + '" height="' + z.h + '" rx="1.5"/>'
+    + '<text class="zlabel" x="' + (z.x + 2.5) + '" y="' + (z.y + 4.5) + '">' + z.name + '</text>'
+  ).join("")
+  + BENCHES.map(b => '<rect class="bench" x="' + b.x + '" y="' + b.y + '" width="'
+      + b.w + '" height="' + b.h + '" rx="1"/>').join("");
+}
+function drawDots(){
+  document.getElementById("dots").innerHTML = LOCATIONS.map(l => {
+    const on = l.id === hi;
+    return (on ? '<circle class="pulse on" cx="' + l.x + '" cy="' + l.y + '" r="2.5"/>' : "")
+      + '<circle class="loc' + (on ? " on" : "") + '" cx="' + l.x + '" cy="' + l.y
+      + '" r="' + (on ? 2.6 : 1.7) + '"/>'
+      + '<text class="lcode' + (on ? " on" : "") + '" x="' + l.x
+      + '" y="' + (l.y + 6) + '" text-anchor="middle">' + l.id + '</text>';
+  }).join("");
+}
+
+function renderFeed(){
+  document.getElementById("feed").innerHTML = feed.length
+    ? feed.slice(0, 20).map(e =>
+        '<li><span class="src">' + esc(e.source) + '</span>'
+        + '<span>' + esc(e.text) + '</span>'
+        + '<time datetime="' + esc(e.at) + '">' + esc(ago(e.at)) + '</time></li>').join("")
+    : '<li><span class="src">idle</span><span>No sightings yet this session.</span><time></time></li>';
+}
+
+function renderStats(){
+  document.getElementById("s-items").textContent = items.length;
+  document.getElementById("s-stale").textContent = items.filter(i => daysSince(i) > 21).length;
+}
+
+function renderAll(){
+  renderStats(); renderFeed();
+  renderResult(document.getElementById("q").value);
+}
+
+/* ---------- writes ---------- */
+async function pushFeed(entry){
+  feed = [entry, ...feed].slice(0, 20);
+  renderFeed();
+  if (db) { try { await db.doc("feed/recent").set({entries:feed}); } catch(e){} }
+}
+async function saveItem(it){
+  const i = items.findIndex(x => x.id === it.id);
+  if (i < 0) items.push(it); else items[i] = it;
+  if (db) { try { await db.collection("items").doc(it.id).set(it); } catch(e){} }
+  renderAll();
+}
+
+/* ---------- interactions ---------- */
+document.getElementById("ask").addEventListener("submit", e => {
+  e.preventDefault();
+  renderResult(document.getElementById("q").value);
+});
+document.getElementById("q").addEventListener("input", e => renderResult(e.target.value));
+
+const EXAMPLES = ["Where are the jumper wires?","dupont","soldering iron",
+                  "something to measure voltage","m3 standoffs","safety glasses"];
+document.getElementById("examples").innerHTML =
+  EXAMPLES.map(t => '<li><button type="button">' + esc(t) + '</button></li>').join("");
+document.getElementById("examples").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  const q = document.getElementById("q");
+  q.value = b.textContent; renderResult(q.value); q.focus();
+});
+
+document.getElementById("sim").addEventListener("click", async () => {
+  if (!items.length) return;
+  const it = {...items[Math.floor(Math.random() * items.length)]};
+  const others = LOCATIONS.filter(l => l.id !== it.locationId);
+  const moved = Math.random() < .45;
+  const dest = moved ? others[Math.floor(Math.random() * others.length)] : LOC[it.locationId];
+  const from = it.locationId;
+  it.locationId = dest.id;
+  it.lastSeenAt = new Date().toISOString();
+  it.confidence = Math.round((.78 + Math.random() * .2) * 100) / 100;
+  it.source = "camera";
+  await saveItem(it);
+  await pushFeed({
+    at: it.lastSeenAt, source: "camera",
+    text: it.name + (moved ? " moved — " + from + " → " + dest.id
+                           : " confirmed at " + dest.id),
+  });
+  setHighlight(dest.id);
+});
+
+document.getElementById("reseed").addEventListener("click", async () => {
+  if (!confirm("Reset the shared inventory to the sample dataset? This affects every viewer of this page.")) return;
+  for (const it of FALLBACK.map(x => ({...x}))) await saveItem(it);
+  await pushFeed({at:new Date().toISOString(), source:"manual", text:"Inventory reset to the sample dataset."});
+});
+
+document.getElementById("add").addEventListener("submit", async e => {
+  e.preventDefault();
+  const name = document.getElementById("a-name").value.trim();
+  if (!name) return;
+  const tags = document.getElementById("a-tags").value.toLowerCase()
+    .split(/[,\s]+/).filter(Boolean);
+  const it = {
+    id: "itm_" + Date.now().toString(36),
+    name, tags, locationId: document.getElementById("a-loc").value,
+    qty: Math.max(1, parseInt(document.getElementById("a-qty").value, 10) || 1),
+    lastSeenAt: new Date().toISOString(), confidence: 1, source: "manual",
+  };
+  await saveItem(it);
+  await pushFeed({at:it.lastSeenAt, source:"manual", text:name + " logged at " + it.locationId});
+  setHighlight(it.locationId);
+  e.target.reset();
+  document.getElementById("a-qty").value = 1;
+});
+
+/* ---------- pod camera: a projected view, not a decoration ---------------
+   Everything in the frame comes from the same geometry the scope uses. Floor
+   returns land on the image ground plane at horizon + f*(camH - h)/range, and
+   each item is a real 0.5 x 0.6 m box sitting at 1.0 m shelf height pushed
+   through the same focal length. Near things sit low and large; far things
+   ride the horizon. The boxes are ground truth projected through the lens --
+   there is no detector here, and the caption under the frame says so.     */
+const cam = (() => {
+  const FOV = 70, RANGE_M = 5.0, MPU = 0.2;
+  const CAM_H = 0.9, SHELF_H = 1.0, OBJ_W = 0.5, OBJ_H = 0.6;
+  const cv = document.getElementById("cam"), ctx = cv.getContext("2d");
+  let px = 1;
+
+  function size(){
+    const w = cv.clientWidth || 320, h = cv.clientHeight || 180;
+    px = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = Math.round(w * px); cv.height = Math.round(h * px);
+  }
+  const norm = d => { d %= 360; if (d > 180) d -= 360; if (d < -180) d += 360; return d; };
+  const bearingOf = (ax, ay) => (Math.atan2(ax, -ay) * 180 / Math.PI + 360) % 360;
+
+  /* Which items this camera can actually justify boxing. */
+  function inFrame(p, axis){
+    const ab = bearingOf(axis[0], axis[1]), out = [];
+    for (const it of items){
+      const l = LOC[it.locationId]; if (!l) continue;
+      const vx = l.x - p.x, vy = l.y - p.y, len = Math.hypot(vx, vy);
+      const m = len * MPU;
+      if (!len || m > RANGE_M) continue;
+      const d = norm(Math.atan2(vx, -vy) * 180 / Math.PI - ab);
+      if (Math.abs(d) > FOV / 2) continue;
+      if (!scope.sees(l)) continue;                      // lidar vetoes it
+      out.push({it, d, m});
+    }
+    return out.sort((a, b) => b.m - a.m);                // far first, so near overlaps
+  }
+
+  let stream = null, video = null, live = false, loopId = 0, pose = null;
+
+  /* Live video is attempted, never assumed: the viewer iframe may not carry a
+     camera grant at all, and the viewer may say no. Either way we fall back. */
+  async function toggleLive(){
+    const btn = document.getElementById("cam-live");
+    const note = document.getElementById("cam-note");
+    if (live){
+      live = false; cancelAnimationFrame(loopId);
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      stream = null; video = null;
+      btn.textContent = "Use the real camera";
+      note.className = "camnote";
+      note.innerHTML = "Frame synthesised from the scan geometry. Boxes are ground "
+        + "truth projected through the lens &mdash; <b>not</b> a trained detector.";
+      idle(); return;
+    }
+    btn.disabled = true; btn.textContent = "Asking\u2026";
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(
+        {video:{facingMode:{ideal:"environment"}}, audio:false});
+      video = document.createElement("video");
+      video.playsInline = true; video.muted = true; video.srcObject = stream;
+      await video.play();
+      live = true;
+      btn.textContent = "Back to synthesised";
+      note.className = "camnote warn";
+      note.innerHTML = "<b>Live video, simulated detections.</b> The frame is your "
+        + "real camera. The boxes are not: no detector is running, and nothing in "
+        + "the picture is being recognised. Every box is a scripted position, "
+        + "marked SIM. Real recognition belongs in the backend.";
+      paint();
+    } catch (e) {
+      note.className = "camnote warn";
+      note.textContent = e && e.name === "NotAllowedError"
+        ? "Camera refused. Either you declined, or this embed carries no camera grant. Staying on the synthesised frame."
+        : "No camera available here (" + ((e && e.name) || "error") + "). Staying on the synthesised frame.";
+      btn.textContent = "Use the real camera";
+    }
+    btn.disabled = false;
+  }
+
+  /* Cover-crop the video into the canvas, whatever its aspect ratio. */
+  function drawVideo(){
+    const W = cv.width, H = cv.height;
+    const vw = video.videoWidth || 16, vh = video.videoHeight || 9;
+    const sc = Math.max(W / vw, H / vh), dw = vw * sc, dh = vh * sc;
+    ctx.drawImage(video, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  }
+
+  function loop(){
+    if (!live) return;
+    paint();
+    loopId = requestAnimationFrame(loop);
+  }
+
+  function paint(){
+    if (!pose) return;
+    render(pose.p, pose.axis, pose.label, pose.rec);
+    if (live && loopId === 0) loopId = requestAnimationFrame(loop);
+  }
+
+  function render(p, axis, label, rec){
+    pose = {p, axis, label, rec};
+    const W = cv.width, H = cv.height, hz = H * 0.46;
+    const f = (W / 2) / Math.tan(FOV / 2 * Math.PI / 180);
+    const ab = bearingOf(axis[0], axis[1]);
+    const xOf = deg => W / 2 + (deg / (FOV / 2)) * (W / 2);
+    const yOf = (h, m) => hz + f * (CAM_H - h) / m;
+
+    ctx.fillStyle = "#0b0f0d"; ctx.fillRect(0, 0, W, H);
+    if (live && video && video.readyState >= 2){
+      drawVideo();
+    } else {
+      const g = ctx.createLinearGradient(0, 0, 0, H);    // ceiling -> floor
+      g.addColorStop(0, "#111a18"); g.addColorStop(.46, "#0d1412"); g.addColorStop(1, "#080c0b");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = "rgba(79,188,174,.16)"; ctx.lineWidth = px;
+      ctx.beginPath(); ctx.moveTo(0, hz); ctx.lineTo(W, hz); ctx.stroke();
+    }
+
+    /* Lidar returns, projected onto the floor plane. This is the depth cue.
+       Over live video it would be claiming a registration we do not have. */
+    for (const pt of (live ? [] : scope.points())){
+      if (pt.m > RANGE_M * 2.2) continue;
+      const d = norm(pt.a - ab);
+      if (Math.abs(d) > FOV / 2) continue;
+      const x = xOf(d), yF = yOf(0, pt.m);
+      if (yF < hz || yF > H) continue;
+      const a = Math.max(.12, Math.min(.8, 1.6 / pt.m));
+      ctx.strokeStyle = "rgba(79,188,174," + a.toFixed(3) + ")";
+      ctx.lineWidth = Math.max(1, px);
+      ctx.beginPath(); ctx.moveTo(x, yF); ctx.lineTo(x, hz + (yF - hz) * .25); ctx.stroke();
+      ctx.fillStyle = "rgba(143,216,205," + a.toFixed(3) + ")";
+      ctx.fillRect(x - px, yF - px, 2 * px, 2 * px);
+    }
+
+    /* Boxes. */
+    for (const {it, d, m} of inFrame(p, axis)){
+      const halfW = Math.atan(OBJ_W / 2 / m) * 180 / Math.PI;
+      const x1 = xOf(d - halfW), x2 = xOf(d + halfW);
+      const yB = yOf(SHELF_H - OBJ_H / 2, m), yT = yOf(SHELF_H + OBJ_H / 2, m);
+      const conf = Math.max(.6, Math.min(.99, 1 - m * .055));
+      ctx.strokeStyle = "#6fc07a"; ctx.lineWidth = 1.6 * px;
+      ctx.strokeRect(x1, yT, x2 - x1, yB - yT);
+
+      const text = (live ? "SIM  " : "") + it.name.split(",")[0].slice(0, 20)
+        + "  " + conf.toFixed(2);
+      ctx.font = "600 " + Math.round(10 * px) + "px 'IBM Plex Mono',monospace";
+      const tw = ctx.measureText(text).width, th = 14 * px;
+      ctx.fillStyle = "#6fc07a";
+      ctx.fillRect(x1, Math.max(0, yT - th), tw + 8 * px, th);
+      ctx.fillStyle = "#08120c";
+      ctx.fillText(text, x1 + 4 * px, Math.max(0, yT - th) + 10.5 * px);
+    }
+
+    if (!live){
+      ctx.fillStyle = "rgba(0,0,0,.05)";                 // faint scanlines
+      for (let y = 0; y < H; y += 3 * px) ctx.fillRect(0, y, W, px);
+    }
+
+    document.getElementById("cam-id").textContent = label;
+    const st = document.getElementById("cam-state");
+    st.textContent = rec ? "rec  " + Math.round(p.x) + "," + Math.round(p.y)
+                         : (live ? "live" : "standby");
+  }
+
+  /* At rest: look down the room from the parked sensor, so the panel is never blank. */
+  function idle(){
+    scope.home();
+    render({x:50, y:34, hx:0, hy:-1}, [0, -1], "CAM-L", false);
+  }
+
+  size();
+  addEventListener("resize", () => { size(); paint(); });
+  document.getElementById("cam-live").addEventListener("click", toggleLive);
+  return {render, idle, size, inFrameCount: (p, a) => inFrame(p, a).length};
+})();
+
+/* ---------- fusion pass: a moving lidar plus two side cameras -------------
+   Real inventory robots mount cameras facing sideways. A forward-facing one
+   barely sees the shelf it drives past, so this pod carries two 70-degree
+   cones reaching 5 m. A detection needs BOTH sensors to agree: the camera
+   must have the item inside a cone, and the lidar must have line of sight to
+   it from where the pod is standing at that instant. Either alone is not a
+   sighting, which is the whole argument for fusing them.                  */
+const pass = (() => {
+  const FOV = 70, RANGE_M = 5.0, MPU = 0.2, SPEED = 30;   // units per second
+  const ROUTE = [{x:10,y:30},{x:90,y:30},{x:90,y:46},{x:10,y:46},{x:10,y:30}];
+  const COS_HALF = Math.cos(FOV / 2 * Math.PI / 180);
+  const R_UNITS = RANGE_M / MPU;
+  const seg = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
+  const TOTAL = ROUTE.slice(1).reduce((t, p, i) => t + seg(ROUTE[i], p), 0);
+  let running = false, flashes = [];
+
+  /* Position and heading at a given arclength along the route. */
+  function at(d){
+    for (let i = 0; i < ROUTE.length - 1; i++){
+      const a = ROUTE[i], b = ROUTE[i + 1], L = seg(a, b);
+      if (d <= L || i === ROUTE.length - 2){
+        const t = Math.min(d / L, 1);
+        return {x:a.x + (b.x - a.x) * t, y:a.y + (b.y - a.y) * t,
+                hx:(b.x - a.x) / L, hy:(b.y - a.y) / L};
+      }
+      d -= L;
+    }
+  }
+
+  function wedge(p, ax, ay){
+    const base = Math.atan2(ay, ax), h = FOV / 2 * Math.PI / 180;
+    const x1 = p.x + Math.cos(base - h) * R_UNITS, y1 = p.y + Math.sin(base - h) * R_UNITS;
+    const x2 = p.x + Math.cos(base + h) * R_UNITS, y2 = p.y + Math.sin(base + h) * R_UNITS;
+    return '<path class="fov" d="M' + p.x.toFixed(2) + ',' + p.y.toFixed(2)
+      + ' L' + x1.toFixed(2) + ',' + y1.toFixed(2)
+      + ' A' + R_UNITS + ',' + R_UNITS + ' 0 0,1 ' + x2.toFixed(2) + ',' + y2.toFixed(2)
+      + ' Z"/>';
+  }
+  function drawPod(p, now){
+    const g = document.getElementById("pod");
+    if (!p){ g.innerHTML = ""; return; }
+    g.innerHTML =
+      wedge(p, -p.hy, p.hx) + wedge(p, p.hy, -p.hx)
+      + flashes.filter(f => f.until > now).map(f =>
+          '<line class="ray" x1="' + p.x.toFixed(2) + '" y1="' + p.y.toFixed(2)
+          + '" x2="' + f.x + '" y2="' + f.y + '"/>'
+          + '<rect class="hit" x="' + (f.x - 3) + '" y="' + (f.y - 3)
+          + '" width="6" height="6" rx="1"/>'
+          + '<text class="hitlabel" x="' + (f.x + 4.5) + '" y="' + (f.y - 3.5) + '">'
+          + esc(f.label) + '</text>').join("")
+      + '<circle class="podring" cx="' + p.x.toFixed(2) + '" cy="' + p.y.toFixed(2) + '" r="2.6"/>'
+      + '<circle class="pod" cx="' + p.x.toFixed(2) + '" cy="' + p.y.toFixed(2) + '" r="1.4"/>';
+  }
+  function report(frac, hits, total){
+    document.getElementById("pass-bar").style.width = Math.round(frac * 100) + "%";
+    document.getElementById("pass-line").innerHTML =
+      "Pass <b>" + Math.round(frac * 100) + "%</b> &middot; <b>" + hits
+      + "</b> confirmed &middot; <b>" + (total - hits) + "</b> not yet seen";
+  }
+
+  async function run(){
+    if (running || !items.length) return;
+    running = true;
+    const btn = document.getElementById("run");
+    btn.disabled = true; btn.textContent = "Scanning…";
+
+    const roster = items.slice(), total = roster.length;
+    const hit = new Set(), found = [];
+    let lastCast = 0;
+
+    await new Promise(done => {
+      const t0 = performance.now();
+      (function step(now){
+        const d = Math.min((now - t0) / 1000 * SPEED, TOTAL), p = at(d);
+        /* Re-casting 500 rays every frame is wasteful; 60 ms is plenty. */
+        if (now - lastCast > 60){ scope.setOrigin(p.x, p.y); lastCast = now; }
+
+        for (const it of roster){
+          if (hit.has(it.id)) continue;
+          const l = LOC[it.locationId]; if (!l) continue;
+          const vx = l.x - p.x, vy = l.y - p.y, len = Math.hypot(vx, vy);
+          if (!len || len > R_UNITS) continue;                     // out of camera reach
+          const ux = vx / len, uy = vy / len;
+          const right = -p.hy * ux + p.hx * uy, left = p.hy * ux - p.hx * uy;
+          if (right < COS_HALF && left < COS_HALF) continue;       // outside both cones
+          if (!scope.sees(l)) continue;                            // lidar says blocked
+          hit.add(it.id);
+          found.push({it, m: len * MPU});
+          flashes.push({x:l.x, y:l.y, until: now + 2400,
+                        label: it.name.split(",")[0].slice(0, 18)});
+          scope.target(l.id);
+        }
+        drawPod(p, now);
+        /* Show whichever mast camera currently has something in frame. */
+        const L = [p.hy, -p.hx], R = [-p.hy, p.hx];
+        const useR = cam.inFrameCount(p, R) > cam.inFrameCount(p, L);
+        cam.render(p, useR ? R : L, useR ? "CAM-R" : "CAM-L", true);
+        report(d / TOTAL, hit.size, total);
+        if (d < TOTAL) requestAnimationFrame(step); else done();
+      })(performance.now());
+    });
+
+    /* Persist after the run, not during it: one write at a time per document. */
+    for (const {it, m} of found){
+      await saveItem({...it, lastSeenAt: new Date().toISOString(),
+        confidence: Math.round(Math.max(.6, Math.min(.99, 1 - m * .055)) * 100) / 100,
+        source: "fusion"});
+    }
+    const missed = total - found.length;
+    await pushFeed({at:new Date().toISOString(), source:"fusion",
+      text:"Scan pass — " + found.length + " of " + total + " confirmed"
+           + (missed ? ", " + missed + " never seen" : "")});
+
+    document.getElementById("pass-line").innerHTML =
+      "Pass complete. <b>" + found.length + "</b> confirmed by fusion, <b>" + missed
+      + "</b> never entered a camera cone with line of sight.";
+    drawPod(null); scope.home(); scope.target(hi); cam.idle();
+    btn.disabled = false; btn.textContent = "Run a scan pass";
+    running = false;
+  }
+
+  document.getElementById("run").addEventListener("click", run);
+  return {run};
+})();
+
+/* ---------- boot ---------- */
+document.getElementById("a-loc").innerHTML =
+  LOCATIONS.map(l => '<option value="' + l.id + '">' + esc(l.id) + " — " + esc(l.name) + "</option>").join("");
+drawPlan(); drawDots();
+items = FALLBACK.map(x => ({...x}));
+renderAll();
+cam.idle();
+
+(async () => {
+  db = await window.claude?.use?.("db") ?? null;
+  if (!db) return;                       // stays on the local index
+  document.getElementById("s-mode").textContent = "shared";
+  db.collection("items").onSnapshot(snap => {
+    if (snap.empty && !ready) { ready = true; return; }   // keep fallback until seeded
+    ready = true;
+    items = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    renderAll();
+  }, () => {});
+  db.doc("feed/recent").onSnapshot(snap => {
+    const d = snap.data();
+    if (d && Array.isArray(d.entries)) { feed = d.entries; renderFeed(); }
+  }, () => {});
+})();
+</script>

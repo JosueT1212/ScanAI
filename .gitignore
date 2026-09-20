@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+data/*.jsonl
+*.pt
+config.local.toml
+.DS_Store
