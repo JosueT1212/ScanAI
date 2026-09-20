@@ -73,3 +73,8 @@ def test_calibrate_yaw_ignores_a_closer_object_behind_the_rig(tmp_path):
 def test_web_dir_is_resolved_from_the_module_not_the_cwd():
     from shelf.app import WEB_DIR
     assert WEB_DIR.is_absolute() and (WEB_DIR / "index.html").exists()
+
+
+def test_index_is_served_at_root(tmp_path):
+    c, _, _ = build(tmp_path)
+    assert c.get("/").status_code == 200

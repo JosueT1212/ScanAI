@@ -838,23 +838,28 @@ const cam = (() => {
   let stream = null, video = null, live = false, loopId = 0, pose = null;
   let liveDets = null, mjpeg = null;
   const DEFAULT_NOTE = document.getElementById("cam-note").innerHTML;
+  /* Single source of truth for the note text, called wherever !live can
+     start being true: from useLive() when the backend pushes a frame, and
+     from toggleLive()'s off-branch, since turning the webcam off can also
+     reveal backend state that was already live underneath it. */
+  function syncNote(){
+    const note = document.getElementById("cam-note");
+    note.className = "camnote";
+    note.innerHTML = liveDets
+      ? "<b>Live camera, live detector.</b> Frame and boxes are both real: an "
+        + "iPhone frame over Continuity Camera, fused with an actual YOLO "
+        + "detection corroborated by lidar line of sight. No SIM tag &mdash; "
+        + "there is nothing simulated in this box."
+      : DEFAULT_NOTE;
+  }
   function useLive(dets, ok){
     liveDets = dets;
     if (ok && !mjpeg){
       mjpeg = new Image();
       mjpeg.src = "/api/camera.mjpg";
     }
-    if (!ok) mjpeg = null;
-    if (!live){                             // webcam toggle owns the note while active
-      const note = document.getElementById("cam-note");
-      note.className = "camnote";
-      note.innerHTML = liveDets
-        ? "<b>Live camera, live detector.</b> Frame and boxes are both real: an "
-          + "iPhone frame over Continuity Camera, fused with an actual YOLO "
-          + "detection corroborated by lidar line of sight. No SIM tag &mdash; "
-          + "there is nothing simulated in this box."
-        : DEFAULT_NOTE;
-    }
+    if (!ok && mjpeg) { mjpeg.src = ""; mjpeg = null; }  // stop the server writing to a dead <img>
+    if (!live) syncNote();                  // webcam toggle owns the note while active
     if (pose) paint();
   }
 
@@ -868,9 +873,7 @@ const cam = (() => {
       if (stream) stream.getTracks().forEach(t => t.stop());
       stream = null; video = null;
       btn.textContent = "Use the real camera";
-      note.className = "camnote";
-      note.innerHTML = "Frame synthesised from the scan geometry. Boxes are ground "
-        + "truth projected through the lens &mdash; <b>not</b> a trained detector.";
+      syncNote();
       idle(); return;
     }
     btn.disabled = true; btn.textContent = "Asking\u2026";
@@ -939,7 +942,11 @@ const cam = (() => {
 
     ctx.fillStyle = "#0b0f0d"; ctx.fillRect(0, 0, W, H);
     let mjT = null;
-    if (mjpeg && mjpeg.naturalWidth){    // streaming multipart <img> never fires "complete"
+    /* Gated on !live: the webcam toggle and the backend can both hold state
+       at once (useLive() never drops liveDets/mjpeg just because the toggle
+       is on, so the backend doesn't have to re-push after a toggle-back),
+       but only one may ever be drawn, and it must match cam-note's claim. */
+    if (!live && mjpeg && mjpeg.naturalWidth){    // streaming multipart <img> never fires "complete"
       mjT = drawMjpeg();
     } else if (live && video && video.readyState >= 2){
       drawVideo();
@@ -970,7 +977,7 @@ const cam = (() => {
     /* Boxes. Real detector output (liveDets, from the backend) is drawn in the
        frame's own pixel coordinates and never carries SIM — every other box
        here is ground truth projected through the lens, and keeps the tag. */
-    if (liveDets){
+    if (!live && liveDets){
       const t = mjT || {sc:1, ox:0, oy:0};
       for (const dt of liveDets){
         const x1 = dt.x1 * t.sc + t.ox, x2 = dt.x2 * t.sc + t.ox;
@@ -1162,22 +1169,29 @@ const pass = (() => {
    synthetic ray-cast unchanged. Same-origin only: the page is always opened
    from the server that would serve the socket, so no host is hardcoded.  */
 const backend = (() => {
-  let live = null, ws = null;
+  let ws = null, delay = 1000, timer = null;
+  const MAX_DELAY = 15000;
   function connect(){
     if (!location.origin.startsWith("http") || location.origin.includes("claude.ai"))
       return;                                  // published artifact: stay synthetic
     const scheme = location.protocol === "https:" ? "wss://" : "ws://";
-    try { ws = new WebSocket(scheme + location.host + "/ws/live"); } catch (e) { return; }
+    ws = new WebSocket(scheme + location.host + "/ws/live");
+    ws.onopen = () => { delay = 1000; };        // reconnect succeeded: reset backoff
     ws.onmessage = ev => {
+      let live;
       try { live = JSON.parse(ev.data); } catch (e) { return; }
       scope.useLive(live.scan);
       cam.useLive(live.detections, live.camera_ok);
     };
-    ws.onclose = () => { live = null; scope.useLive(null); cam.useLive(null, false); };
+    ws.onclose = () => {
+      scope.useLive(null); cam.useLive(null, false);
+      if (timer) return;                        // a retry is already scheduled
+      timer = setTimeout(() => { timer = null; connect(); }, delay);
+      delay = Math.min(delay * 2, MAX_DELAY);
+    };
     ws.onerror = () => { try { ws.close(); } catch (e) {} };
   }
   connect();
-  return {isLive: () => live !== null};
 })();
 
 /* ---------- boot ---------- */
