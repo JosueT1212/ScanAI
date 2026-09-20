@@ -1332,7 +1332,7 @@ git commit -m "feat: local API, live websocket and mjpeg camera stream"
 ### Task 8: Frontend live source adapter
 
 **Files:**
-- Modify: `web/findit.html` — the `scope` module's `points()` source, the `cam` module's background, and the boot block.
+- Modify: `web/index.html` — the `scope` module's `points()` source, the `cam` module's background, and the boot block.
 
 **Interfaces:**
 - Consumes: `WS /ws/live` payload `{scan, detections, sightings, station, camera_ok}`, and `GET /api/camera.mjpg`.
@@ -1349,7 +1349,7 @@ There is no DOM test harness in this project and adding one for a single adapter
 import pathlib
 import re
 
-HTML = pathlib.Path("web/findit.html").read_text()
+HTML = pathlib.Path("web/index.html").read_text()
 
 
 def test_live_source_is_wired():
@@ -1375,7 +1375,7 @@ Expected: FAIL on `test_live_source_is_wired` — no WebSocket URL in the file y
 
 - [ ] **Step 3: Write the adapter**
 
-Insert this immediately before the `/* ---------- boot ---------- */` comment in `web/findit.html`:
+Insert this immediately before the `/* ---------- boot ---------- */` comment in `web/index.html`:
 
 ```javascript
 /* ---------- live backend source ---------------------------------------
@@ -1449,7 +1449,7 @@ the ray-cast, and the camera panel shows the live stream.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add web/findit.html tests/test_frontend_contract.py
+git add web/index.html tests/test_frontend_contract.py
 git commit -m "feat: frontend falls back to synthetic when no backend answers"
 ```
 

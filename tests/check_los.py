@@ -1,4 +1,4 @@
-"""Mirrors the slab/cast/occluded math in findit.html. Fails loudly if the
+"""Mirrors the slab/cast/occluded math in index.html. Fails loudly if the
 line-of-sight split changes."""
 import math
 SENSOR=(50,34); ROOM=dict(x=.6,y=.6,w=98.8,h=66.8)
@@ -39,7 +39,7 @@ assert sum(r<8 for r in rs)>40, "benches should produce some short returns"
 print(f"OK  blind={sorted(blind)}  visible={sorted(set(LOCS)-blind)}")
 print(f"    range {min(rs):.2f}-{max(rs):.2f} m over {len(rs)} returns")
 
-# --- fusion pass coverage: mirrors the pass module in findit.html ------------
+# --- fusion pass coverage: mirrors the pass module in index.html ------------
 FOV, RANGE_M, MPU = 70, 5.0, .2
 R_U = RANGE_M / MPU
 COS_HALF = math.cos(math.radians(FOV / 2))
