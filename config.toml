@@ -1,0 +1,8 @@
+hfov = 68.0            # iPhone wide-lens horizontal FOV, degrees. Calibrate.
+yaw_offset = 0.0       # phone rotation vs lidar zero, degrees. Calibrate.
+lidar_port = "/dev/cu.usbserial-210"
+lidar_binary = "~/Documents/HackMIT/rplidar_sdk/output/Darwin/Release/ultra_simple"
+camera_name = "iPhone" # substring matched against macOS camera names
+conf_floor = 0.45      # YOLO confidence floor
+edge_reject = 0.10     # reject detections in the outer 10% of frame width
+db_path = "scanai.db"
