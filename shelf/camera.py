@@ -69,5 +69,12 @@ class CameraSource:
 
     def close(self) -> None:
         self._stop.set()
+        if self._thread is not None:
+            # A stale Continuity device can hang inside cap.read(); bound the wait
+            # rather than block shutdown forever. The thread is a daemon, so a
+            # genuinely wedged read cannot keep the process alive.
+            self._thread.join(timeout=2.0)
+            self._thread = None
         if self._cap is not None:
             self._cap.release()
+            self._cap = None
