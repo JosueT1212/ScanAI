@@ -33,3 +33,25 @@ def test_stations_round_trip(tmp_path):
     got = s.stations()
     assert len(got) == 1
     assert got[0].heading == 90.0
+
+
+def test_concurrent_sightings_of_one_class_make_one_item(tmp_path):
+    """Task 6 writes from the capture thread; check-then-act would duplicate."""
+    import threading
+    s = make(tmp_path)
+    barrier = threading.Barrier(8)
+
+    def worker():
+        barrier.wait()                      # maximise the overlap
+        s.record_sighting(Sighting("cup", 0.9, 10.0, 2.0, 12.0, 30.0))
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    for t in threads: t.start()
+    for t in threads: t.join()
+    assert len(s.items()) == 1
+
+
+def test_tags_round_trip_as_a_list(tmp_path):
+    s = make(tmp_path)
+    s.record_sighting(Sighting("cup", 0.9, 10.0, 2.0, 12.0, 30.0))
+    assert s.items()[0]["tags"] == ["cup"]

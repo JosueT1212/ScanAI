@@ -1,6 +1,7 @@
 """sqlite3 from the stdlib. Three tables do not need an ORM."""
 import json
 import sqlite3
+import threading
 import time
 from datetime import datetime, timezone
 
@@ -26,13 +27,19 @@ class Store:
     def __init__(self, db_path: str) -> None:
         self.db = sqlite3.connect(db_path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
+        self._lock = threading.Lock()
 
     def init(self) -> None:
         self.db.executescript(SCHEMA)
         self.db.commit()
 
     def items(self) -> list[dict]:
-        return [dict(r) for r in self.db.execute("SELECT * FROM items")]
+        out = []
+        for r in self.db.execute("SELECT * FROM items"):
+            d = dict(r)
+            d["tags"] = json.loads(d["tags"]) if d.get("tags") else []
+            out.append(d)
+        return out
 
     def locations(self) -> list[dict]:
         return [dict(r) for r in self.db.execute("SELECT * FROM locations")]
@@ -56,25 +63,30 @@ class Store:
 
     def record_sighting(self, s: Sighting) -> str:
         """Class-level identity for v1: two cups are one item. Instance identity
-        is not solvable with COCO classes and is deferred in the spec."""
-        row = self.db.execute(
-            "SELECT id FROM items WHERE cls_name=?", (s.cls_name,)).fetchone()
-        iid = row["id"] if row else f"itm_{s.cls_name}_{int(time.time()*1000)}"
-        loc = self._nearest_location(s.x, s.y)
-        if row:
-            self.db.execute(
-                "UPDATE items SET last_seen_at=?, confidence=?, source='fusion', "
-                "location_id=?, x=?, y=? WHERE id=?",
-                (_now(), s.conf, loc, s.x, s.y, iid))
-        else:
-            self.db.execute(
-                "INSERT INTO items (id,name,tags,cls_name,location_id,qty,"
-                "last_seen_at,confidence,source,x,y) VALUES (?,?,?,?,?,1,?,?,?,?,?)",
-                (iid, s.cls_name.replace("_", " ").title(),
-                 json.dumps([s.cls_name]), s.cls_name, loc, _now(),
-                 s.conf, "fusion", s.x, s.y))
-        self.db.commit()
-        return iid
+        is not solvable with COCO classes and is deferred in the spec.
+
+        Held under a lock: the read-modify-write below is not atomic in sqlite,
+        and Task 6 calls this from the capture thread while HTTP handlers read.
+        """
+        with self._lock:
+            row = self.db.execute(
+                "SELECT id FROM items WHERE cls_name=?", (s.cls_name,)).fetchone()
+            iid = row["id"] if row else f"itm_{s.cls_name}_{int(time.time()*1000)}"
+            loc = self._nearest_location(s.x, s.y)
+            if row:
+                self.db.execute(
+                    "UPDATE items SET last_seen_at=?, confidence=?, source='fusion', "
+                    "location_id=?, x=?, y=? WHERE id=?",
+                    (_now(), s.conf, loc, s.x, s.y, iid))
+            else:
+                self.db.execute(
+                    "INSERT INTO items (id,name,tags,cls_name,location_id,qty,"
+                    "last_seen_at,confidence,source,x,y) VALUES (?,?,?,?,?,1,?,?,?,?,?)",
+                    (iid, s.cls_name.replace("_", " ").title(),
+                     json.dumps([s.cls_name]), s.cls_name, loc, _now(),
+                     s.conf, "fusion", s.x, s.y))
+            self.db.commit()
+            return iid
 
     def _nearest_location(self, x: float, y: float) -> str | None:
         best, bd = None, 1e9
