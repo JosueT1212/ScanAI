@@ -8,6 +8,21 @@ def test_picks_last_enumerated_when_index_is_default(monkeypatch):
     assert src.index == 2
 
 
+def test_auto_pick_warns_which_index_it_chose(monkeypatch, caplog):
+    monkeypatch.setattr(camera, "list_cameras", lambda: [(0, "camera 0"), (2, "camera 2")])
+    with caplog.at_level("WARNING"):
+        camera.CameraSource(Config())
+    assert any("2" in r.getMessage() and "auto" in r.getMessage()
+               for r in caplog.records)
+
+
+def test_no_cameras_found_also_warns(monkeypatch, caplog):
+    monkeypatch.setattr(camera, "list_cameras", lambda: [])
+    with caplog.at_level("WARNING"):
+        camera.CameraSource(Config())
+    assert any("0" in r.getMessage() for r in caplog.records)
+
+
 def test_no_cameras_found_falls_back_to_zero(monkeypatch):
     monkeypatch.setattr(camera, "list_cameras", lambda: [])
     src = camera.CameraSource(Config())

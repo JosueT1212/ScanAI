@@ -5,9 +5,12 @@ HTTPS/tunnel problem a phone-browser capture page would have created.
 A background thread reads continuously so a slow consumer never backs up
 the capture queue.
 """
+import logging
 import threading
 
 import cv2
+
+log = logging.getLogger(__name__)
 
 
 def list_cameras(limit: int = 6) -> list[tuple[int, str]]:
@@ -37,7 +40,19 @@ class CameraSource:
 
     def _pick(self) -> int:
         cams = list_cameras()
-        return cams[-1][0] if cams else 0    # Continuity usually enumerates last
+        if not cams:
+            log.warning("no cameras enumerated; falling back to index 0. "
+                        "That is likely the built-in webcam, not Continuity. "
+                        "Pin camera_index in config.local.toml.")
+            return 0
+        index = cams[-1][0]
+        log.warning("camera_index is -1 (auto); picked index %d (last enumerated). "
+                    "This is only the iPhone while Continuity is active -- with the "
+                    "phone asleep it silently falls back to the built-in webcam. "
+                    "Run `python -m shelf --list-cameras`, confirm with "
+                    "`system_profiler SPCameraDataType`, then pin camera_index in "
+                    "config.local.toml.", index)
+        return index    # Continuity usually enumerates last
 
     def start(self) -> None:
         self._cap = cv2.VideoCapture(self.index)

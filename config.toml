@@ -3,7 +3,10 @@ yaw_offset = 0.0       # phone rotation vs lidar zero, degrees. Calibrate.
 lidar_port = "/dev/cu.usbserial-210"
 lidar_binary = "~/Documents/HackMIT/rplidar_sdk/output/Darwin/Release/ultra_simple"
 camera_name = "iPhone" # substring matched against macOS camera names
-camera_index = -1      # -1 = last enumerated camera; `python -m shelf --camera N` overrides this
+camera_index = -1      # -1 = last enumerated camera at pipeline start; pinning is
+                        # recommended, not this fallback -- see README "Camera pinning".
+                        # `python -m shelf --list-cameras` to enumerate,
+                        # `python -m shelf --camera N` to override for one run.
 conf_floor = 0.45      # YOLO confidence floor
 edge_reject = 0.10     # reject detections in the outer 10% of frame width
 db_path = "scanai.db"

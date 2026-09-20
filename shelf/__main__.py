@@ -4,13 +4,14 @@
     python -m shelf --replay data/room.jsonl
     python -m shelf                        # live lidar + Continuity camera
     python -m shelf --camera 1             # override the enumerated camera index
+    python -m shelf --list-cameras         # print enumerated cameras and exit
 """
 import argparse
 
 import uvicorn
 
 from .app import create_app
-from .camera import CameraSource
+from .camera import CameraSource, list_cameras
 from .capture import LidarSource, ReplaySource
 from .config import load
 from .detect import Detector, StubDetector
@@ -25,7 +26,17 @@ def main() -> None:
     ap.add_argument("--port", type=int, default=8000)
     ap.add_argument("--camera", type=int, default=None,
                      help="override cfg.camera_index")
+    ap.add_argument("--list-cameras", action="store_true",
+                     help="print enumerated cameras and exit, no pipeline started")
     args = ap.parse_args()
+
+    if args.list_cameras:
+        for index, name in list_cameras():
+            print(f"{index}: {name}")
+        print("OpenCV cannot name devices on macOS. Cross-check with:\n"
+              "  system_profiler SPCameraDataType\n"
+              "then pin the chosen index as camera_index in config.local.toml.")
+        return
 
     cfg = load()
     store = Store(cfg.db_path)
