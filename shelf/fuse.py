@@ -57,16 +57,20 @@ def returns_within(rev, bearing: float, half_width: float) -> list[float]:
 
 
 def robust_min(ranges: list[float]) -> float:
-    """10th percentile, so one spurious near return cannot drag the range in.
-    Below five samples there is no percentile worth trusting: use the median."""
+    """Roughly the 10th percentile, so one spurious near return cannot drag
+    the range in. Below five samples there is no percentile worth trusting:
+    use the median. From five samples up, the index is clamped to at least 1
+    (the second-smallest) so a single outlier is always rejected even in the
+    common 5-9 sample band, where a literal 10th percentile would round down
+    to index 0 and let the outlier straight through."""
     if not ranges:
         raise ValueError("robust_min of an empty window")
     s = sorted(ranges)
     n = len(s)
     if n < 5:
         return s[n // 2]
-    idx = int(n * 0.10)
-    return s[idx - 1] if idx >= 1 else s[0]
+    idx = min(n - 1, max(1, int(n * 0.10)))
+    return s[idx]
 
 
 def associate(det: Detection, frame_w: float, rev, station: Station, cfg):

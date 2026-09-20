@@ -67,6 +67,14 @@ def test_robust_min_falls_back_to_median_when_sparse():
     assert robust_min([2.0, 3.0, 4.0]) == pytest.approx(3.0)
 
 
+def test_robust_min_rejects_an_outlier_in_the_small_window_band():
+    """5-9 returns is the common case for a mid-size box at typical range.
+    A single spurious near return must not become the reported distance."""
+    for n in range(5, 10):
+        ranges = [0.3] + [4.0] * (n - 1)
+        assert robust_min(ranges) == pytest.approx(4.0), f"n={n} let the outlier through"
+
+
 def test_returns_within_wraps_around_zero():
     rev = Revolution(t=0.0, pts=[(359.0, 1.0), (1.0, 1.5), (180.0, 9.0)])
     got = returns_within(rev, bearing=0.0, half_width=2.0)
