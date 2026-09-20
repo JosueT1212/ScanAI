@@ -34,3 +34,10 @@ try:
 finally:
     src.close()
     print(f"\nwrote {n} revolutions to {out}")
+
+# ultra_simple can exit 0 on a bind failure (its stderr goes to the terminal,
+# not caught here), so a bad port silently produces an empty, "successful"
+# recording. Make that visible to anything checking the exit code rather than
+# reading the file size.
+if n == 0:
+    sys.exit(1)

@@ -10,9 +10,12 @@ identity. Neither sensor can do the other's job.
 
 ```bash
 uv venv --python 3.11 && uv pip install -e .
-python -m shelf --stub --replay data/room.jsonl   # no hardware, needs a recording (see "Record a room" below)
-python -m shelf                                   # live: real lidar + Continuity camera
+uv run python -m shelf --stub --replay data/room.jsonl   # no hardware, needs a recording (see "Record a room" below)
+uv run python -m shelf                                   # live: real lidar + Continuity camera
 ```
+
+`uv venv` creates `.venv` but does not activate it, so every command below
+goes through `uv run` rather than assuming an activated shell.
 
 `data/room.jsonl` is gitignored and none ships in this repo, so the
 hardware-free command only works after you've recorded one yourself — see
@@ -32,9 +35,11 @@ webcam detections with lidar ranges without any error. `CameraSource._pick()`
 logs a warning naming the index it chose whenever it has to guess, but the
 recommended setup is to not make it guess:
 
-1. `python -m shelf --list-cameras` — prints what OpenCV enumerates. On
+1. `uv run python -m shelf --list-cameras` — prints what OpenCV enumerates. On
    macOS this is unhelpful by itself: `[(0, 'camera 0'), (1, 'camera 1')]`,
-   since OpenCV cannot read device names on this platform.
+   since OpenCV cannot read device names on this platform. It also prints an
+   `OpenCV: camera failed to properly initialize!` line per absent index it
+   probes up to its limit — cosmetic, expected, not a fault.
 2. `system_profiler SPCameraDataType` — lists the same devices with real
    names, in the same (AVFoundation) order. Verified on this machine:
    index 0 = "MacBook Pro Camera", index 1 = "iPad de Josue Camera" (Model ID
