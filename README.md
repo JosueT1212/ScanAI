@@ -10,9 +10,16 @@ identity. Neither sensor can do the other's job.
 
 ```bash
 uv venv --python 3.11 && uv pip install -e .
-python -m shelf --stub --replay data/room.jsonl   # no hardware
-python -m shelf                                   # live
+python -m shelf --stub --replay data/room.jsonl   # no hardware, needs a recording (see "Record a room" below)
+python -m shelf                                   # live: real lidar + Continuity camera
 ```
+
+`data/room.jsonl` is gitignored and none ships in this repo, so the
+hardware-free command only works after you've recorded one yourself — see
+"Record a room" below, which itself needs the lidar attached once. There is
+currently no hardware-free path that works on a completely fresh clone with
+nothing recorded yet. `--stub` alone (no `--replay`) still opens the real
+`LidarSource`; it only swaps out the detector, not the lidar.
 
 Open http://127.0.0.1:8000.
 
@@ -54,7 +61,9 @@ measurements, not guesses:
 - `hfov` — the phone's horizontal field of view; tune until a box's bearing
   agrees with the lidar's reading of the same object.
 
-Both go in `config.local.toml`, which is gitignored.
+Both go in `config.local.toml`, which is gitignored. This procedure has not
+been run against hardware yet on this machine — see the note under "Record a
+room" below.
 
 ## Record a room
 
