@@ -71,7 +71,7 @@ class ReplaySource:
                     time.sleep(max(0.0, d["t"] - prev_t))
                 prev_t = d["t"]
                 yield Revolution(t=d["t"],
-                                 pts=[(float(a), mm / 1000.0) for a, mm in d["pts"]])
+                                 pts=[(float(a), mm / 1000.0) for a, mm in d["pts"] if mm > 0])
 
     def close(self) -> None:
         pass
@@ -97,6 +97,11 @@ class LidarSource:
             rev = asm.feed(*got)
             if rev is not None:
                 yield rev
+        rc = self.proc.wait()
+        if rc != 0:
+            raise RuntimeError(
+                f"{binary} exited {rc} (port={self.cfg.lidar_port}). "
+                "Check the port with: ls /dev/cu.usbserial*")
 
     def close(self) -> None:
         if self.proc and self.proc.poll() is None:

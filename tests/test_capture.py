@@ -1,5 +1,6 @@
 import json
-from shelf.capture import parse_line, RevolutionAssembler, ReplaySource
+import pytest
+from shelf.capture import parse_line, RevolutionAssembler, ReplaySource, LidarSource
 
 
 def test_parse_line_converts_mm_to_metres():
@@ -34,3 +35,19 @@ def test_replay_source_yields_recorded_revolutions(tmp_path):
     assert len(revs) == 2
     assert revs[0].pts == [(0.0, 1.0), (180.0, 2.0)]
     assert revs[1].pts == [(90.0, 1.5)]
+
+
+def test_replay_source_drops_zero_distance_samples(tmp_path):
+    """Replay is capture too: a 0 mm sample means no return, never a measurement."""
+    p = tmp_path / "z.jsonl"
+    p.write_text(json.dumps({"t": 0.0, "pts": [[0.0, 1000], [90.0, 0], [180.0, 2000]]}) + "\n")
+    rev = next(ReplaySource(str(p), realtime=False).revolutions())
+    assert rev.pts == [(0.0, 1.0), (180.0, 2.0)]
+
+
+def test_lidar_source_raises_when_the_binary_fails(tmp_path):
+    """A wrong port must not look like an empty room."""
+    from shelf.config import Config
+    src = LidarSource(Config(lidar_binary="/usr/bin/false", lidar_port="/dev/null"))
+    with pytest.raises(RuntimeError, match="exited"):
+        list(src.revolutions())
