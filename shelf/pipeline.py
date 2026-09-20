@@ -1,9 +1,12 @@
 """The loop. One lidar revolution plus one camera frame becomes zero or more
 positioned sightings. Runs on a thread; the API reads snapshot() from asyncio."""
+import logging
 import threading
 from dataclasses import asdict
 
 from .fuse import Station, associate
+
+log = logging.getLogger(__name__)
 
 
 class Pipeline:
@@ -16,7 +19,13 @@ class Pipeline:
         self._snap = {"scan": [], "detections": [], "sightings": [],
                       "station": None, "camera_ok": camera.available()}
         sts = store.stations()
-        self.station = sts[0] if sts else Station("home", "Home", 50.0, 34.0, 0.0)
+        if sts:
+            self.station = sts[0]
+        else:
+            log.warning("no stations in the store; using a fallback pose at "
+                        "(%.1f, %.1f). Run seed_coco_defaults() — sightings will "
+                        "otherwise be positioned from an assumed origin.", 50.0, 34.0)
+            self.station = Station("home", "Home", 50.0, 34.0, 0.0)
 
     def set_station(self, station_id: str) -> None:
         for s in self.store.stations():
@@ -48,7 +57,12 @@ class Pipeline:
         for rev in self.lidar.revolutions():
             if self._stop.is_set():
                 break
-            self.tick(rev)
+            try:
+                self.tick(rev)
+            except Exception:                    # noqa: BLE001
+                # One bad tick must not blind the service permanently: the loop is
+                # the only thing keeping the index current.
+                log.exception("tick failed; continuing")
 
     def start(self) -> None:
         self.camera.start()
@@ -57,6 +71,9 @@ class Pipeline:
 
     def stop(self) -> None:
         self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=2.0)
+            self._thread = None
         self.lidar.close()
         self.camera.close()
 
