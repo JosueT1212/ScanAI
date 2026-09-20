@@ -13,6 +13,7 @@ class Config:
     lidar_port: str = "/dev/cu.usbserial-210"
     lidar_binary: str = "ultra_simple"
     camera_name: str = "iPhone"
+    camera_index: int = -1
     conf_floor: float = 0.45
     edge_reject: float = 0.10
     db_path: str = "scanai.db"
